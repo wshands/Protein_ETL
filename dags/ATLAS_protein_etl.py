@@ -14,7 +14,6 @@ from requests.adapters import HTTPAdapter, Retry
 
 import logging
 import os
-import psycopg
 import re
 import requests
 
@@ -74,13 +73,15 @@ def protein_etl():  # by default the dag_id is the name of the decorated functio
     @task(retries=2)  # you can override default_args at the task level
     def extract_protein_data(**context) -> list:
         """
-        Retrieve data about galaxies.
-        This task simulates an extraction step in an ETL pipeline.
+        Retrieve data about a protein from Uniprot.
         Args:
-            num_galaxies (int): The number of galaxies for which data should be returned.
-            Default is 20. Maximum is 20.
+            context (dict): The context dictionary provided by Airflow.
+            This contains information about the task instance and other runtime parameters.
+            protein_name (str): The name of the protein to search for.
+            Default is "cdk3".
         Returns:
-            pd.DataFrame: A DataFrame containing data about galaxies.
+            list: A list of protein data in FASTA format.
+            The data is retrieved from the Uniprot API using the search endpoint.
         """
         # retrieve param values from the context
         protein_name = context["params"][
@@ -123,14 +124,12 @@ def protein_etl():  # by default the dag_id is the name of the decorated functio
     @task
     def transform_protein_data(fasta_list: list) -> list[dict]:
         """
-        Filter the galaxy data based on the distance from the Milky Way.
-        This task simulates a transformation step in an ETL pipeline.
+        Transform the protein data by filtering based on the protein name.
         Args:
-            closeness_threshold_light_years (int): The threshold for filtering
-            galaxies based on distance.
-            Default is 500,000 light years.
+            fasta_list (list): A list of protein data in FASTA format.
         Returns:
-            pd.DataFrame: A DataFrame containing filtered galaxy data.
+            list: A list of dictionaries containing the filtered protein data.
+            Each dictionary contains the protein name and sequence.
         """
         filtered_protein_list = [fasta for fasta in fasta_list if 'Homo sapiens' in fasta]
 
@@ -144,6 +143,14 @@ def protein_etl():  # by default the dag_id is the name of the decorated functio
 
     @task
     def load_protein_data(filtered_protein_list: list[dict]):
+        """
+            Load the protein data into a Postgres DB
+            Args:
+                filtered_protein_list: a list of objects
+                where each object contains a protein name and sequence
+            Returns:
+                Void
+        """
         t_log.info(filtered_protein_list)
 
         pg_hook = PostgresHook(postgres_conn_id=_POSTGRES_CONN_ID)
@@ -171,7 +178,7 @@ def protein_etl():  # by default the dag_id is the name of the decorated functio
     # automatically creates a task dependency
     extract_protein_data_obj = extract_protein_data()
     transform_protein_data_obj = transform_protein_data(extract_protein_data_obj)
-    load_galaxy_data_obj = load_protein_data(transform_protein_data_obj)
+    load_protein_data_obj = load_protein_data(transform_protein_data_obj)
 
 
 # Instantiate the DAG
