@@ -115,6 +115,10 @@ def protein_etl():  # by default the dag_id is the name of the decorated functio
             # Process the batch of data
             all_fastas = batch.text
             # Split the FASTA data into individual entries
+            # The regex splits the string at the newline character followed by a '>'
+            # This assumes that each FASTA entry starts with a '>' character
+            # and is followed by the protein name and sequence
+            # The regex captures the entire entry including the header and sequence
             fasta_list = re.split(r'\n(?=>)', all_fastas)
             t_log.info(f"Total FASTA entries: {total}")
             t_log.info(f"Number of FASTA entries in this batch: {len(fasta_list)}")
@@ -136,7 +140,7 @@ def protein_etl():  # by default the dag_id is the name of the decorated functio
         t_log.info("Filtering protiens for 'Homo sapiens'.")
 
         filtered_protein_list_of_dict = [
-               {'name': s.split('\n', 1)[0], 'sequence': s.split('\n', 1)[1]} if '\n' in s else {'name': s, 'sequence': ''} for s in filtered_protein_list]
+               {'name': s.split('\n', 1)[0], 'sequence': s.split('\n', 1)[1].replace('\n', '')} if '\n' in s else {'name': s, 'sequence': ''} for s in filtered_protein_list]
    
         return filtered_protein_list_of_dict
 
